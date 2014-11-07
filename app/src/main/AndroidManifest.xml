@@ -13,7 +13,7 @@
 
         <service
             android:name=".LiveCardService"
-            android:icon="@drawable/ic_glass_logo"
+            android:icon="@drawable/ic_launcher"
             android:label="@string/title_activity_live_card_service" >
             <intent-filter>
                 <action android:name="com.google.android.glass.action.VOICE_TRIGGER" />

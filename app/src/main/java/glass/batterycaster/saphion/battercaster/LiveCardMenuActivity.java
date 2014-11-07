@@ -32,8 +32,6 @@ public class LiveCardMenuActivity extends Activity {
                 stopService(new Intent(this, LiveCardService.class));
                 return true;
             case R.id.action_toggle_temp:
-                // Stop the service which will unpublish the live card.
-//                stopService(new Intent(this, LiveCardService.class));
                 getSharedPreferences(LiveCardService.PREF_NAME,
                         Context.MODE_MULTI_PROCESS).edit().putBoolean(LiveCardService.MAIN_TEMP, !getSharedPreferences(LiveCardService.PREF_NAME,
                         Context.MODE_MULTI_PROCESS).getBoolean(

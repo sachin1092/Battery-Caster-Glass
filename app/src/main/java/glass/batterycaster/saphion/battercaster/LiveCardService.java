@@ -11,15 +11,14 @@ import android.content.SharedPreferences;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.IBinder;
-import android.util.Log;
 import android.util.TypedValue;
 import android.widget.RemoteViews;
 
 import com.google.android.glass.timeline.LiveCard;
 import com.google.android.glass.timeline.LiveCard.PublishMode;
 
-import glass.batterycaster.saphion.battercaster.utils.ActivityFuncs;
 import glass.batterycaster.saphion.battercaster.utils.Functions;
+import glass.batterycaster.saphion.battercaster.utils.Log;
 import glass.batterycaster.saphion.battercaster.utils.PreferenceHelper;
 import glass.batterycaster.saphion.battercaster.utils.TimeFuncs;
 
@@ -36,11 +35,9 @@ public class LiveCardService extends Service {
     private LiveCard mLiveCard;
     boolean isConnected;
     String temperature;
-    String health;
     int level;
-    String willlast;
+    String willLast;
     SharedPreferences mPref;
-    private long reqTime;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -73,17 +70,17 @@ public class LiveCardService extends Service {
 
     @SuppressLint("NewApi")
     public void updateCard() {
-        RemoteViews remoteViews = new RemoteViews(getPackageName(), R.layout.live_card);
+        RemoteViews remoteViews = new RemoteViews(getPackageName(), R.layout.bat_card);
         remoteViews.setTextViewText(R.id.tvBat, readBattery() + "");
         remoteViews.setTextViewText(R.id.tvStatsTempVal, temperature);
         remoteViews.setTextViewText(R.id.tvLeftStatTitle, isConnected ? "Charged in" : "Empty in");
-        remoteViews.setTextViewText(R.id.tvLeftStatVal, willlast);
+        remoteViews.setTextViewText(R.id.tvLeftStatVal, willLast);
         remoteViews.setTextViewText(R.id.tvPlugged, isConnected ? "Plugged" : "Unplugged");
 
         String mainText = getSharedPreferences(PREF_NAME,
                 Context.MODE_MULTI_PROCESS).getString(PreferenceHelper.LAST_CHARGED,
                 TimeFuncs.getCurrentTimeStamp());
-        String time = TimeFuncs.convtohournminnday(TimeFuncs.newDiff(
+        String time = TimeFuncs.convToHourAndMinDay(TimeFuncs.newDiff(
                 TimeFuncs.GetItemDate(mainText),
                 TimeFuncs.GetItemDate(TimeFuncs.getCurrentTimeStamp())));
         if (!time.equals("0 Minute(s)"))
@@ -105,6 +102,7 @@ public class LiveCardService extends Service {
         public void onReceive(Context context, Intent intent) {
             updateCard();
             triggerFunc(intent.getAction());
+            processCharge();
         }
 
     };
@@ -135,22 +133,24 @@ public class LiveCardService extends Service {
                 getSharedPreferences(PREF_NAME,
                         Context.MODE_MULTI_PROCESS).getBoolean(
                         MAIN_TEMP, true), true);
-        health = ActivityFuncs.getBatHealth(batteryIntent);
 
         if (isConnected) {
             long diff;
             diff = getSharedPreferences(PREF_NAME,
                     Context.MODE_MULTI_PROCESS).getLong(
                     PreferenceHelper.BAT_CHARGE, 81);
-            willlast = TimeFuncs.convtohournminnday(diff
+            willLast = TimeFuncs.convToHourAndMinDay(diff
                     * (100 - level));
-        } else {
+            if(level == 100){
+                willLast = "Fully Charged";
+            }
+         } else {
             long diff;
             diff = (long) (getSharedPreferences(PREF_NAME,
                     Context.MODE_MULTI_PROCESS).getLong(
                     PreferenceHelper.BAT_DISCHARGE, 792));
 
-            willlast = TimeFuncs.convtohournminnday(diff * (level));
+            willLast = TimeFuncs.convToHourAndMinDay(diff * (level));
         }
 
         return level;
@@ -310,7 +310,7 @@ public class LiveCardService extends Service {
 
         mPrefEditor.commit();
 
-        processCharge();
+
 
     }
 
@@ -322,93 +322,15 @@ public class LiveCardService extends Service {
                 TimeFuncs.GetItemDate(TimeFuncs.getCurrentTimeStamp()));
 
         Log.d("New diff ","" + diff);
-        // TODO
-
         Log.d("Previous Date: ","" + TimeFuncs.GetItemDate(prevTime));
         Log.d("Current Date: ",""
                 + TimeFuncs.GetItemDate(TimeFuncs.getCurrentTimeStamp()));
-        // Log.d( "Previous Timestamp " + level + "");
-        // Log.d( "Current Timestamp " + level + "");
-
-        String subtext;
-
-        Log.d("Current Level ",level + "");
-        Log.d("Previous Level ",""
-                + mPref.getInt(PreferenceHelper.PREV_BAT_LEVEL, level) + "");
-        if (level < mPref.getInt(PreferenceHelper.PREV_BAT_LEVEL, level)) {
-
-            diff = (long) (mPref.getLong(PreferenceHelper.BAT_DISCHARGE, diff));
-
-            reqTime = diff * level;
-            subtext = "Empty in " + TimeFuncs.convtohournminnday(reqTime);
-
-            // mPref
-            // .edit().putLong(PreferenceHelper.BAT_DISCHARGE, diff)
-            // .commit();
-            Log.d("Discharging with ","" + diff);
-
-        } else {
-            if (level > mPref.getInt(PreferenceHelper.PREV_BAT_LEVEL, level)) {
-                if (level != 100
-                        && TimeFuncs.convtohournminnday(diff * (100 - level))
-                        .equalsIgnoreCase("0 Minute(s)")) {
-                    reqTime = (long) (81 * (100 - level));
-                    subtext = "Full Charge in "
-                            + TimeFuncs.convtohournminnday(reqTime);
-                } else {
-                    reqTime = diff * (100 - level);
-                    subtext = "Full Charge in "
-                            + TimeFuncs.convtohournminnday(reqTime);
-                    mPref.edit().putLong(PreferenceHelper.BAT_CHARGE, diff)
-                            .commit();
-                }
-
-                Log.d("Charging with ","" + diff);
-
-            } else {
-
-                if (isConnected) {
-                    reqTime = (long) (mPref.getLong(
-                            PreferenceHelper.BAT_CHARGE, 81) * (100 - level));
-                    subtext = "Full Charge in "
-                            + TimeFuncs.convtohournminnday(reqTime);
-                    Log.d("Estimating Charging", "");
-                    // mPref
-                    // .edit().putLong("batcharge", diff).commit();
-                    Log.d("EST Charging with ","" + diff);
-
-                } else {
-                    reqTime = (long) (mPref.getLong(
-                            PreferenceHelper.BAT_DISCHARGE, 792) * (level));
-                    subtext = "Empty in "
-                            + TimeFuncs.convtohournminnday(reqTime);
-                    Log.d("Estimating Discharging with: ",""
-                            + (long) (mPref.getLong(
-                            PreferenceHelper.BAT_DISCHARGE, 792)));
-                }
-            }
-        }
-
-        if (level == 100 && isConnected) {
-            subtext = "Fully Charged";
-            reqTime = 0;
-        }
-
-        String mainText = mPref.getString(PreferenceHelper.LAST_CHARGED,
-                TimeFuncs.getCurrentTimeStamp());
 
         if (isConnected) {
             if (mPref.getBoolean("plugged?", true))
                 mPref.edit()
                         .putString(PreferenceHelper.LAST_CHARGED,
                                 TimeFuncs.getCurrentTimeStamp()).commit();
-            String time = TimeFuncs.convtohournminnday(TimeFuncs.newDiff(
-                    TimeFuncs.GetItemDate(mainText),
-                    TimeFuncs.GetItemDate(TimeFuncs.getCurrentTimeStamp())));
-            if (!time.equals("0 Minute(s)"))
-                mainText = "Plugged " + time + " ago";
-            else
-                mainText = "Plugged " + "right now";
             mPref.edit().putBoolean("plugged?", false).commit();
 
         } else {
@@ -418,18 +340,6 @@ public class LiveCardService extends Service {
                         .putString(PreferenceHelper.LAST_CHARGED,
                                 TimeFuncs.getCurrentTimeStamp()).commit();
             }
-
-            mainText = mPref.getString(PreferenceHelper.LAST_CHARGED,
-                    TimeFuncs.getCurrentTimeStamp());
-
-            String time = TimeFuncs.convtohournminnday(TimeFuncs.newDiff(
-                    TimeFuncs.GetItemDate(mainText),
-                    TimeFuncs.GetItemDate(TimeFuncs.getCurrentTimeStamp())));
-
-            if (!time.equals("0 Minute(s)"))
-                mainText = "Unplugged " + time + " ago";
-            else
-                mainText = "Unplugged " + "right now";
         }
     }
 
