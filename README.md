@@ -4,7 +4,7 @@ Battery-Caster-Glass
 Battery Caster for Google Glass
 
 Battery Indicator live card for Google Glass.
-Features:
+<br/>Features:
 * Battery Level
 * Temperature
 * Battery Life span Estimate
